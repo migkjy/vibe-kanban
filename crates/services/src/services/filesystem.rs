@@ -51,6 +51,69 @@ impl FilesystemService {
         FilesystemService {}
     }
 
+    /// List available drives on Windows (e.g., C:, D:, E:)
+    /// Returns empty list on non-Windows platforms
+    pub fn list_drives(&self) -> Vec<DirectoryEntry> {
+        #[cfg(windows)]
+        {
+            let mut drives = Vec::new();
+            // Check drives A-Z
+            for letter in b'A'..=b'Z' {
+                let drive_path = format!("{}:\\", letter as char);
+                let path = PathBuf::from(&drive_path);
+                if path.exists() {
+                    drives.push(DirectoryEntry {
+                        name: format!("{}: Drive", letter as char),
+                        path,
+                        is_directory: true,
+                        is_git_repo: false,
+                        last_modified: None,
+                    });
+                }
+            }
+            drives
+        }
+
+        #[cfg(not(windows))]
+        {
+            // On Unix-like systems, return root and common mount points
+            let mut mounts = Vec::new();
+            let root = PathBuf::from("/");
+            if root.exists() {
+                mounts.push(DirectoryEntry {
+                    name: "/ (Root)".to_string(),
+                    path: root,
+                    is_directory: true,
+                    is_git_repo: false,
+                    last_modified: None,
+                });
+            }
+            // Check common mount points
+            for mount in &["/mnt", "/media", "/Volumes"] {
+                let path = PathBuf::from(mount);
+                if path.exists() && path.is_dir() {
+                    if let Ok(entries) = fs::read_dir(&path) {
+                        for entry in entries.flatten() {
+                            let entry_path = entry.path();
+                            if entry_path.is_dir() {
+                                if let Some(name) = entry_path.file_name().and_then(|n| n.to_str()) {
+                                    mounts.push(DirectoryEntry {
+                                        name: name.to_string(),
+                                        path: entry_path,
+                                        is_directory: true,
+                                        is_git_repo: false,
+                                        last_modified: None,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            mounts
+        }
+    }
+
     #[cfg(not(feature = "qa-mode"))]
     fn get_directories_to_skip() -> HashSet<String> {
         let mut skip_dirs = HashSet::from(

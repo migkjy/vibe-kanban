@@ -17,6 +17,7 @@ import {
   File,
   Folder,
   FolderOpen,
+  HardDrive,
   Home,
   Search,
 } from 'lucide-react';
@@ -41,6 +42,8 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
     const { t } = useTranslation('common');
     const [currentPath, setCurrentPath] = useState<string>('');
     const [entries, setEntries] = useState<DirectoryEntry[]>([]);
+    const [drives, setDrives] = useState<DirectoryEntry[]>([]);
+    const [showDrives, setShowDrives] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [manualPath, setManualPath] = useState(value);
@@ -57,8 +60,18 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
       if (modal.visible) {
         setManualPath(value);
         loadDirectory();
+        loadDrives();
       }
     }, [modal.visible, value]);
+
+    const loadDrives = async () => {
+      try {
+        const driveList = await fileSystemApi.listDrives();
+        setDrives(driveList);
+      } catch (err) {
+        console.error('Failed to load drives:', err);
+      }
+    };
 
     const loadDirectory = async (path?: string) => {
       setLoading(true);
@@ -107,8 +120,20 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
     };
 
     const handleHomeDirectory = () => {
+      setShowDrives(false);
       loadDirectory();
       // Don't set manual path here since home directory path varies by system
+    };
+
+    const handleShowDrives = () => {
+      setShowDrives(true);
+      setSearchTerm('');
+    };
+
+    const handleDriveClick = (drive: DirectoryEntry) => {
+      setShowDrives(false);
+      loadDirectory(drive.path.toString());
+      setManualPath(drive.path.toString());
     };
 
     const handleManualPathChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -202,26 +227,37 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
                   variant="outline"
                   size="sm"
                   className="flex-shrink-0"
+                  title="Home Directory"
                 >
                   <Home className="h-4 w-4" />
+                </Button>
+                <Button
+                  onClick={handleShowDrives}
+                  variant={showDrives ? 'default' : 'outline'}
+                  size="sm"
+                  className="flex-shrink-0"
+                  title="Show Drives"
+                >
+                  <HardDrive className="h-4 w-4" />
                 </Button>
                 <Button
                   onClick={handleParentDirectory}
                   variant="outline"
                   size="sm"
-                  disabled={!currentPath || currentPath === '/'}
+                  disabled={!currentPath || currentPath === '/' || showDrives}
                   className="flex-shrink-0"
+                  title="Parent Directory"
                 >
                   <ChevronUp className="h-4 w-4" />
                 </Button>
                 <div className="text-sm text-muted-foreground flex-1 truncate min-w-0">
-                  {currentPath || 'Home'}
+                  {showDrives ? 'Select Drive' : (currentPath || 'Home')}
                 </div>
                 <Button
                   onClick={handleSelectCurrent}
                   variant="outline"
                   size="sm"
-                  disabled={!currentPath}
+                  disabled={!currentPath || showDrives}
                   className="flex-shrink-0"
                 >
                   {t('folderPicker.selectCurrent')}
@@ -230,7 +266,33 @@ const FolderPickerDialogImpl = NiceModal.create<FolderPickerDialogProps>(
 
               {/* Directory listing */}
               <div className="flex-1 border rounded-md overflow-auto">
-                {loading ? (
+                {showDrives ? (
+                  // Drive selection view
+                  <div className="p-2">
+                    {drives.length === 0 ? (
+                      <div className="p-4 text-center text-muted-foreground">
+                        No drives found
+                      </div>
+                    ) : (
+                      drives.map((drive, index) => (
+                        <div
+                          key={index}
+                          className="flex items-center space-x-2 p-2 rounded cursor-pointer hover:bg-accent"
+                          onClick={() => handleDriveClick(drive)}
+                          title={drive.path.toString()}
+                        >
+                          <HardDrive className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                          <span className="text-sm flex-1 truncate min-w-0">
+                            {drive.name}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {drive.path.toString()}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                ) : loading ? (
                   <div className="p-4 text-center text-muted-foreground">
                     Loading...
                   </div>

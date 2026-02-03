@@ -71,8 +71,16 @@ pub async fn list_git_repos(
     }
 }
 
+pub async fn list_drives(
+    State(deployment): State<DeploymentImpl>,
+) -> Result<ResponseJson<ApiResponse<Vec<DirectoryEntry>>>, ApiError> {
+    let drives = deployment.filesystem().list_drives();
+    Ok(ResponseJson(ApiResponse::success(drives)))
+}
+
 pub fn router() -> Router<DeploymentImpl> {
     Router::new()
         .route("/filesystem/directory", get(list_directory))
         .route("/filesystem/git-repos", get(list_git_repos))
+        .route("/filesystem/drives", get(list_drives))
 }

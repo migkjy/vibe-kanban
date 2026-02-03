@@ -789,6 +789,11 @@ export const fileSystemApi = {
     );
     return handleApiResponse<DirectoryEntry[]>(response);
   },
+
+  listDrives: async (): Promise<DirectoryEntry[]> => {
+    const response = await makeRequest('/api/filesystem/drives');
+    return handleApiResponse<DirectoryEntry[]>(response);
+  },
 };
 
 // Repo APIs
